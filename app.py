@@ -79,11 +79,14 @@ class MoviesView(Resource):
         return movies_schema.dump(movies)
 
 
-@movie_ns.route('/<mid>')
+@movie_ns.route('/<int:mid>')
 class MovieView(Resource):
     def get(self, mid):
         movie = Movie.query.get(mid)
-        return movie_schema.dump(movie)
+        if movie is None:
+            return 'No movie for this id', 404
+        else:
+            return movie_schema.dump(movie), 201
 
 
 @director_ns.route('/')
@@ -93,17 +96,29 @@ class DirectorsView(Resource):
         return directors_schema.dump(directors)
 
     def post(self):
-        get_director = request.json
-        director_db = Director.query.order_by(desc(Director.id)).first()
-        get_director['id'] = director_db.id + 1
-        new_director = Director(**get_director)
-        db.session.add(new_director)
-        db.session.commit()
-        db.session.close()
-        return 'Ok', 201
+        data = request.json
+        data.pop('id', None)
+        try:
+            obj = Director(**data)
+            db.session.add(obj)
+            db.session.commit()
+        except Exception:
+            return 'Failed to insert director', 400
+        else:
+            db.session.refresh(obj)
+            return director_schema.dump(obj), 201
 
-@director_ns.route('/<did>')
+
+@director_ns.route('/<int:did>')
 class DirectorView(Resource):
+
+    def get(self, did):
+        director = Director.query.get(did)
+        if director is None:
+            return 'No director for this id', 404
+        else:
+            return director_schema.dump(director), 201
+
     def put(self, did):
         get_director_put = request.json
         director_update = Director.query.get(did)
@@ -118,7 +133,7 @@ class DirectorView(Resource):
         db.session.delete(director_delete)
         db.session.commit()
         db.session.close()
-        return 'Ok', 204
+        return None, 204
 
 
 if __name__ == '__main__':
